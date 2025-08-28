@@ -46,3 +46,8 @@ You can test Koncerto locally using the PHP Web server.
 * Extend `KoncertoController` for faster developement
 * Use `.tbs.html` extension for templates
 * Redirect requests to `/` (and `/index.php`) towards `koncerto.php` using `RewriteRule` when possible
+
+# Ressources
+
+* CSS Framework: https://bulma.io/
+* Icons: https://icons8.com/line-awesome/
