@@ -30,7 +30,16 @@ class Koncerto
      */
     public static function cli($args)
     {
-        var_dump($args);
+        if ('serve' === $args[1]) {
+            $port = '8080';
+            if (isset($args[2])) {
+                $port = $args[2];
+            }
+            exec(sprintf(
+                'php -S localhost:%s koncerto.php &',
+                $port
+            ));
+        }
     }
 
     /**
