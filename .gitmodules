@@ -1,0 +1,3 @@
+[submodule "tinybutstrong"]
+	path = tinybutstrong
+	url = https://github.com/Skrol29/tinybutstrong.git
