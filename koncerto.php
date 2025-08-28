@@ -132,7 +132,7 @@ class KoncertoRequest
      */
     public function getResponse()
     {
-        $pathInfo = isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : '/';
+        $pathInfo = isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : $_SERVER['SCRIPT_NAME'];
         $router = new KoncertoRouter();
         list($controller, $controllerAction) = $router->match($pathInfo);
 
