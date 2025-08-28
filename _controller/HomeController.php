@@ -9,8 +9,7 @@ class HomeController extends KoncertoController
     public function index()
     {
         return $this->render('home.tbs.html', [
-            'page_title' => 'Welcome',
-            'ip' => $_SERVER['REMOTE_ADDR']
+            'page_title' => 'Welcome'
         ]);
     }
 }
