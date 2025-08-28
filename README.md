@@ -35,6 +35,12 @@ Rendering a template completes the MVP using TinyButStrong template engine.
 
 Templates are located inside `_templates` folder.
 
+# Testing
+
+You can test Koncerto locally using the PHP Web server.
+
+```./bin/koncerto serve```
+
 # Recommandations
 
 * Extend `KoncertoController` for faster developement
