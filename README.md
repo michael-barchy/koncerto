@@ -13,6 +13,7 @@ Koncerto shares many concepts with frameworks like Symfony, including :
 * Routing
 * Controllers
 * Templates
+* Forms
 
 ## Routing
 
@@ -34,6 +35,20 @@ It extends `KoncertoController` that includes helper functions such as `render`.
 Rendering a template completes the MVP using TinyButStrong template engine.
 
 Templates are located inside `_templates` folder.
+
+## Forms
+
+Koncerto provides TBS access to helper objects and functions.
+
+The ~form object allows rapid creation of forms inside templates.
+
+Example form row:
+
+```html
+<form>
+    [onshow.~form.row(firstname, {"label":"First name"});strconv=no]
+</form>
+````
 
 # Testing
 
