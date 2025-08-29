@@ -7,9 +7,16 @@
         </div>
         <div class="field-body">
             <div class="field">
+                [onshow;block=div;when [row.type;ifempty=text;noerr]~=(text|email)]
                 <p class="control">
                     <input class="input" name="[row.name]" type="[row.type;ifempty=text;noerr]" />
                 </p>
+            </div>
+            <div class="select">
+                [onshow;block=div;when [row.type;ifempty=text;noerr]~=(select)]
+                <select name="[row.name;noerr]">
+                    <option value="[options.$;block=option;noerr]">[options.val]</option>
+                </select>
             </div>
         </div>
     </div>

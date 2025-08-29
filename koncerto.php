@@ -284,10 +284,10 @@ class KoncertoForm
      */
     public function row($name)
     {
-        $args = func_get_args();
+        $args = \func_get_args();
         \array_shift($args);
 
-        $json = implode(', ', $args);
+        $json = \implode(', ', $args);
         $args = \json_decode($json, true);
         $args['name'] = $name;
 
@@ -295,6 +295,11 @@ class KoncertoForm
         $tbs->Source = '[onload;file=_templates/_form.tbs.html;getpart=row]';
         $tbs->LoadTemplate(null);
         $tbs->MergeField('row', $args);
+        foreach ($args as $key => $arg) {
+            if (is_array($arg)) {
+                $tbs->MergeBlock($key, 'array', $arg);
+            }
+        }
         $tbs->Show(TBS_NOTHING);
 
         return $tbs->Source;
