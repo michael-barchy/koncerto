@@ -15,8 +15,6 @@ if ('cli' === php_sapi_name()) {
 
 class Koncerto
 {
-    public $TBS;
-
     /** @var ?KoncertoRequest */
     private static $request = null;
 
@@ -120,6 +118,10 @@ class Koncerto
     public static function tbs()
     {
         $tbs = new clsTinyButStrong();
+        $tbs->ObjectRef = array();
+        $tbs->ObjectRef['app'] = new Koncerto();
+        $tbs->ObjectRef['form'] = new KoncertoForm();
+        $tbs->MethodsAllowed = true;
 
         return $tbs;
     }
@@ -271,5 +273,30 @@ class KoncertoController
         }
 
         return $response->setContent($tbs->Show());
+    }
+}
+
+class KoncertoForm
+{
+    /**
+     * @param string $name
+     * @return string
+     */
+    public function row($name)
+    {
+        $args = func_get_args();
+        \array_shift($args);
+
+        $json = implode(', ', $args);
+        $args = \json_decode($json, true);
+        $args['name'] = $name;
+
+        $tbs = Koncerto::tbs();
+        $tbs->Source = '[onload;file=_templates/_form.tbs.html;getpart=row]';
+        $tbs->LoadTemplate(null);
+        $tbs->MergeField('row', $args);
+        $tbs->Show(TBS_NOTHING);
+
+        return $tbs->Source;
     }
 }
