@@ -1,0 +1,16 @@
+{
+    "name": "michael-barchy/koncerto",
+    "type": "library",
+    "version": "0.0.1",
+    "minimum-stability": "alpha",
+    "autoload": {
+        "psr-4": {
+            "Koncerto\\": "./"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "5.3"
+        }
+    }
+}
