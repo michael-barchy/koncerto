@@ -12,7 +12,7 @@ readdirSync(root).forEach((f) => {
         console.debug(f);
         let src = readFileSync(p).toString();
         if ('' !== namespace) {
-            src = src.replace(namespace, '');
+            src = src.replace(namespace, `// ${p}`);
             if (src.startsWith('<?php')) {
                 src = src.substring(5);
             }

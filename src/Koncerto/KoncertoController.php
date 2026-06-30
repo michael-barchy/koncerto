@@ -4,6 +4,17 @@ namespace Koncerto;
 
 class KoncertoController
 {
+    /** @var Koncerto $koncerto */
+    private $koncerto;
+
+    /**
+     * @param Koncerto $koncerto
+     */
+    public function __construct($koncerto)
+    {
+        $this->koncerto = $koncerto;
+    }
+
     /**
      * @param mixed $data
      * @return KoncertoResponse
@@ -15,5 +26,26 @@ class KoncertoController
         $response->setContent((string)json_encode($data));
 
         return $response;
+    }
+
+    /**
+     * @param string $template
+     * @param ?array<string, mixed> $context
+     * @return KoncertoResponse
+     * @throws \Exception
+     */
+    public function render($template, $context = array())
+    {
+        $engine = $this->koncerto->getConfig('templateEngine');
+        if (null === $engine || !is_string($engine) || !class_exists($engine)) {
+            throw new \Exception('No template engine defined or template engine not found');
+        }
+
+        $e = new $engine();
+        if (!$e instanceof KoncertoTemplate) {
+            throw new \Exception('Invalid template engine');
+        }
+
+        return $e->render($template, $context);
     }
 }

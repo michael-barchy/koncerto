@@ -55,7 +55,10 @@ class Koncerto
                 return 0 === strpos($class, $prefix);
             });
             $prefix = array_values($mapping);
-            $prefix = $prefix[0];
+            $prefix = array_shift($prefix);
+            if (null === $prefix) {
+                $prefix = '';
+            }
             $mapping = array_flip($mapping);
             $src = array_shift($mapping);
             if (null === $src) {
@@ -85,6 +88,10 @@ class Koncerto
      */
     public function getConfig($key)
     {
+        if (!array_key_exists($key, $this->config)) {
+            return null;
+        }
+
         return $this->config[$key];
     }
 
@@ -125,7 +132,7 @@ class Koncerto
             return null;
         }
 
-        $o = new $class();
+        $o = new $class($this);
         $response = $o->$method();
 
         header('Content-type: ' . $response->getContentType());
@@ -135,7 +142,7 @@ class Koncerto
 }
 
 
-
+// src/Koncerto/KoncertoAnnotation.php
 
 use ReflectionClass;
 
@@ -198,10 +205,21 @@ class KoncertoAnnotation
 }
 
 
-
+// src/Koncerto/KoncertoController.php
 
 class KoncertoController
 {
+    /** @var Koncerto $koncerto */
+    private $koncerto;
+
+    /**
+     * @param Koncerto $koncerto
+     */
+    public function __construct($koncerto)
+    {
+        $this->koncerto = $koncerto;
+    }
+
     /**
      * @param mixed $data
      * @return KoncertoResponse
@@ -214,10 +232,62 @@ class KoncertoController
 
         return $response;
     }
+
+    /**
+     * @param string $template
+     * @param ?array<string, mixed> $context
+     * @return KoncertoResponse
+     * @throws \Exception
+     */
+    public function render($template, $context = array())
+    {
+        $engine = $this->koncerto->getConfig('templateEngine');
+        if (null === $engine || !is_string($engine) || !class_exists($engine)) {
+            throw new \Exception('No template engine defined or template engine not found');
+        }
+
+        $e = new $engine();
+        if (!$e instanceof KoncertoTemplate) {
+            throw new \Exception('Invalid template engine');
+        }
+
+        return $e->render($template, $context);
+    }
 }
 
 
+// src/Koncerto/KoncertoHereTemplate.php
 
+class KoncertoHereTemplate implements KoncertoTemplate
+{
+    /** @var object */
+    private $here;
+
+    public function __construct()
+    {
+        if (!class_exists('HereTemplate\\HereTemplate')) {
+            throw new \Exception('HereTemplate is not installed');
+        }
+
+        $this->here = new \HereTemplate\HereTemplate();
+    }
+
+    public function render($template, $context = array())
+    {
+        if (!method_exists($this->here, 'render')) {
+            throw new \Exception('HereTemplate is not properly installed');
+        }
+
+        $content = $this->here->render($template, $context);
+        $response = new KoncertoResponse();
+        $response->setContent($content);
+
+        return $response;
+    }
+}
+
+
+// src/Koncerto/KoncertoRequest.php
 
 class KoncertoRequest
 {
@@ -318,7 +388,7 @@ class KoncertoRequest
 }
 
 
-
+// src/Koncerto/KoncertoResponse.php
 
 class KoncertoResponse
 {
@@ -365,4 +435,50 @@ class KoncertoResponse
     {
         return $this->contentType;
     }
+}
+
+
+// src/Koncerto/KoncertoTbsTemplate.php
+
+class KoncertoTbsTemplate implements KoncertoTemplate
+{
+    /** @var object */
+    private $tbs;
+
+    public function __construct()
+    {
+        if (!class_exists('clsTinyButStrong')) {
+            throw new \Exception('TinyButStrong is not installed');
+        }
+
+        $this->tbs = new \clsTinyButStrong();
+    }
+
+    public function render($template, $context = array())
+    {
+        if (!method_exists($this->tbs, 'LoadTemplate') || !method_exists($this->tbs, 'Show')) {
+            throw new \Exception('TinyButStrong is not properly installed');
+        }
+
+        $this->tbs->LoadTemplate($template);
+        $content = $this->tbs->Show();
+        $response = new KoncertoResponse();
+        $response->setContent($content);
+
+        return $response;
+    }
+}
+
+
+// src/Koncerto/KoncertoTemplate.php
+
+interface KoncertoTemplate
+{
+    /**
+     * @param string $template
+     * @param ?array<string, mixed> $context
+     * @return KoncertoResponse
+     * @throws \Exception
+     */
+    public function render($template, $context = array());
 }

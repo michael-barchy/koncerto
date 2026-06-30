@@ -55,7 +55,10 @@ class Koncerto
                 return 0 === strpos($class, $prefix);
             });
             $prefix = array_values($mapping);
-            $prefix = $prefix[0];
+            $prefix = array_shift($prefix);
+            if (null === $prefix) {
+                $prefix = '';
+            }
             $mapping = array_flip($mapping);
             $src = array_shift($mapping);
             if (null === $src) {
@@ -85,6 +88,10 @@ class Koncerto
      */
     public function getConfig($key)
     {
+        if (!array_key_exists($key, $this->config)) {
+            return null;
+        }
+
         return $this->config[$key];
     }
 
@@ -125,7 +132,7 @@ class Koncerto
             return null;
         }
 
-        $o = new $class();
+        $o = new $class($this);
         $response = $o->$method();
 
         header('Content-type: ' . $response->getContentType());
