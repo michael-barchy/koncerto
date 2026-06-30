@@ -30,7 +30,7 @@ class KoncertoController
 
     /**
      * @param string $template
-     * @param ?array<string, mixed> $context
+     * @param array<string, mixed> $context = array()
      * @return KoncertoResponse
      * @throws \Exception
      */
@@ -47,5 +47,22 @@ class KoncertoController
         }
 
         return $e->render($template, $context);
+    }
+
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function getConfig($key)
+    {
+        $this->koncerto->getConfig($key);
+    }
+
+    /**
+     * @return KoncertoRequest
+     */
+    public function getRequest()
+    {
+        return $this->koncerto->request();
     }
 }

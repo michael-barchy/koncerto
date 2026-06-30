@@ -39,6 +39,22 @@ class Koncerto
     }
 
     /**
+     * @return string
+     */
+    public function getDocumentRoot()
+    {
+        $root = $this->getConfig('documentRoot');
+
+        if (null === $root || !is_string($root)) {
+            $hasScript = array_key_exists('SCRIPT_FILENAME', $_SERVER);
+            $script = $hasScript && is_string($_SERVER['SCRIPT_FILENAME']) ? $_SERVER['SCRIPT_FILENAME'] : __FILE__;
+            $root = dirname($script);
+        }
+
+        return $root;
+    }
+
+    /**
      * @return void
      */
     private function autoload()
@@ -46,7 +62,8 @@ class Koncerto
         /** @var array<string, string> */
         $autoload = array_key_exists('autoload', $this->config) ? (array)$this->config['autoload'] : array();
         $autoload = array_flip($autoload);
-        spl_autoload_register(function ($class) use ($autoload) {
+        $root = $this->getDocumentRoot();
+        spl_autoload_register(function ($class) use ($autoload, $root) {
             if (class_exists($class, false)) {
                 return;
             }
@@ -54,26 +71,26 @@ class Koncerto
             $mapping = array_filter($autoload, function ($prefix) use ($class) {
                 return 0 === strpos($class, $prefix);
             });
+
             $prefix = array_values($mapping);
             $prefix = array_shift($prefix);
             if (null === $prefix) {
                 $prefix = '';
             }
+
             $mapping = array_flip($mapping);
             $src = array_shift($mapping);
             if (null === $src) {
                 return;
             }
 
-            $hasScript = array_key_exists('SCRIPT_FILENAME', $_SERVER);
-            $script = $hasScript && is_string($_SERVER['SCRIPT_FILENAME']) ? $_SERVER['SCRIPT_FILENAME'] : __FILE__;
-            $root = dirname($script);
             $classFile = sprintf(
                 '%s/%s/%s',
                 $root,
                 $src,
                 preg_replace('/\\\/', '/', str_replace($prefix, '', $class)) . '.php'
             );
+
             $classPath = realpath($classFile);
             if (false !== $classPath && is_file($classPath)) {
                 require_once($classPath);
@@ -116,8 +133,17 @@ class Koncerto
         }
 
         $match = $request->match();
+
         if (null === $match) {
-            return null;
+            $response = $this->asset($request);
+
+            if (null === $response) {
+                return null;
+            }
+
+            $this->headers($response);
+
+            return $response->getContent();
         }
 
         $parts = explode('::', $match);
@@ -135,16 +161,71 @@ class Koncerto
         $o = new $class($this);
         $response = $o->$method();
 
-        header('Content-type: ' . $response->getContentType());
+        $this->headers($response);
 
         return $response->getContent();
+    }
+
+    /**
+     * @param KoncertoResponse $response
+     * @return void
+     */
+    private function headers($response)
+    {
+        header('Content-type: ' . $response->getContentType());
+    }
+
+    /**
+     * @param KoncertoRequest $request
+     * @return ?KoncertoResponse
+     */
+    private function asset($request)
+    {
+        $file = '.' . $request->getPathInfo();
+        if ('/' === substr($file, -1)) {
+            $file = substr($file, 0, strlen($file) - 1);
+        }
+
+        if (!is_file($file)) {
+            $parts = explode('/', $file);
+            array_shift($parts);
+            array_shift($parts);
+            $root = $this->getDocumentRoot();
+
+            $file = $root . '/' . implode('/', $parts);
+        }
+
+        if (!is_file($file)) {
+            return null;
+        }
+
+        $assetTypes = array(
+            'text\/.*',
+            'image\/.*',
+            'video\/.*',
+            'application\/json'
+        );
+        $contentType = mime_content_type($file);
+        if (false === $contentType) {
+            $contentType = 'text/plain';
+        }
+
+        foreach ($assetTypes as $type) {
+            if (preg_match('/' . $type . '/', $contentType)) {
+                $response = new KoncertoResponse();
+                $response->setContentType($contentType);
+                $response->setContent((string)file_get_contents($file));
+
+                return $response;
+            }
+        }
+
+        return null;
     }
 }
 
 
 // src/Koncerto/KoncertoAnnotation.php
-
-use ReflectionClass;
 
 class KoncertoAnnotation
 {
@@ -153,6 +234,24 @@ class KoncertoAnnotation
      * @return array{name: string} $params
      */
     public static function route($params)
+    {
+        return $params;
+    }
+
+    /**
+     * @param array{name: string} $params
+     * @return array{name: string} $params
+     */
+    public static function liveProp($params)
+    {
+        return $params;
+    }
+
+    /**
+     * @param array{name: string} $params
+     * @return array{name: string} $params
+     */
+    public static function liveAction($params)
     {
         return $params;
     }
@@ -171,11 +270,16 @@ class KoncertoAnnotation
         $parsed = array();
 
         if (class_exists($className, false)) {
-            $ref = new ReflectionClass($className);
-            $methods = $ref->getMethods();
+            $ref = new \ReflectionClass($className);
+            $methods = $ref->getMethods(\ReflectionProperty::IS_PUBLIC);
             foreach ($methods as $method) {
                 $key = $className . '::' . $method->getName();
                 $parsed[$key] = KoncertoAnnotation::parseAnnotation((string)$method->getDocComment());
+            }
+            $props = $ref->getProperties(\ReflectionProperty::IS_PUBLIC);
+            foreach ($props as $prop) {
+                $key = $className . '::' . $prop->getName();
+                $parsed[$key] = KoncertoAnnotation::parseAnnotation((string)$prop->getDocComment());
             }
         }
 
@@ -235,7 +339,7 @@ class KoncertoController
 
     /**
      * @param string $template
-     * @param ?array<string, mixed> $context
+     * @param array<string, mixed> $context = array()
      * @return KoncertoResponse
      * @throws \Exception
      */
@@ -252,6 +356,23 @@ class KoncertoController
         }
 
         return $e->render($template, $context);
+    }
+
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function getConfig($key)
+    {
+        $this->koncerto->getConfig($key);
+    }
+
+    /**
+     * @return KoncertoRequest
+     */
+    public function getRequest()
+    {
+        return $this->koncerto->request();
     }
 }
 
@@ -287,6 +408,216 @@ class KoncertoHereTemplate implements KoncertoTemplate
 }
 
 
+// src/Koncerto/KoncertoImpulsusController.php
+
+/**
+ * Koncerto Impulsus Bridge
+ */
+class KoncertoImpulsusController extends KoncertoController
+{
+    /**
+     * @param Koncerto $koncerto
+     */
+    public function __construct($koncerto)
+    {
+        parent::__construct($koncerto);
+    }
+
+    public function render($template, $context = array())
+    {
+        if (null !== $this->getRequest()->get('_live') && method_exists($this, 'postMount')) {
+            $live = $this->getRequest()->get('_live');
+            if (is_string($live)) {
+                $data = (array)json_decode($live, true);
+            } else {
+                $data = (array)$live;
+            }
+            /** @var array<string, string> $data*/
+            $this->postMount($data);
+        }
+
+        if (null !== $this->getRequest()->get('_action')) {
+            $action = $this->getRequest()->get('_action');
+            if (is_string($action) && method_exists($this, $action)) {
+                return $this->$action();
+            }
+        }
+
+        $response = parent::render($template, $context);
+        $js = $this->getConfig('impulsus');
+        if (null == $js || !is_string($js)) {
+            $js = '/impulsus/impulsus.js';
+        }
+
+        $impulsus = sprintf(
+            '<script type="text/javascript" src="%s"></script>',
+            $js
+        );
+
+        $root = $this->getRequest()->getPathInfo();
+        if ('/' === substr($root, -1)) {
+            $root = substr($root, 0, strlen($root) - 1);
+        }
+        $baseHref = sprintf(
+            '<base href=".%s" />',
+            $root
+        );
+
+        $live = sprintf(
+            '<script type="text/javascript" data-name="$live">%s</script>',
+            $this->live()
+        );
+
+        $head = sprintf(
+            "  %s\r\n  %s\r\n  %s\r\n</head>",
+            $baseHref,
+            $live,
+            $impulsus
+        );
+
+        $content = $response->getContent();
+
+        $content = str_replace(
+            '</head>',
+            $head,
+            $content
+        );
+
+        $response->setContent($content);
+
+        return $response;
+    }
+
+    /**
+     * @return string
+     */
+    private function live()
+    {
+        if (method_exists($this, 'postMount')) {
+            $this->postMount();
+        }
+
+        $targetsJS = $this->targets();
+        $eventsJS = $this->events();
+
+        return <<<JS
+
+
+window.addEventListener('impulsus:ready', function () {
+    var root = document.querySelector('html');
+    if (root) {
+        root.setAttribute('data-controller', '\$live');
+    }
+});
+
+window.addEventListener('impulsus:controller', function (event) {
+    (function (impulsus) {
+        if (impulsus) {
+            var models = Array.prototype.slice.call(document.querySelectorAll('[data-model]'));
+            models.forEach((function(model) {
+                model.setAttribute('data--live-target', model.getAttribute('data-model'));
+            }));
+
+            impulsus.controller(function (controller) {
+                {$targetsJS}
+                {$eventsJS}
+            }, event);
+        }
+    })(window.Impulsus);
+});
+
+
+JS;
+    }
+
+    /**
+     * @return string
+     */
+    private function targets()
+    {
+        $className = get_class($this);
+        $props = array();
+        $ref = new \ReflectionClass($className);
+        $f = $ref->getFileName();
+        if (false !== $f) {
+            $parsed = KoncertoAnnotation::parseClass($f);
+            foreach ($parsed as $classProp => $annotations) {
+                $parts = explode('::', $classProp);
+                $propName = array_pop($parts);
+                /** @var array<array-key, mixed> $annotations */
+                if (!empty($propName) && array_key_exists('liveProp()', $annotations)) {
+                    $props[$propName] = $annotations['liveProp()'];
+                }
+            }
+        }
+
+        $targets = array();
+        foreach ($props as $propName => $prop) {
+            array_push($targets, sprintf(
+                "controller.targets[%s].set(%s);",
+                json_encode($prop['name']),
+                json_encode($this->{$propName})
+            ));
+        }
+        $targetsJS = implode("\r\n            ", $targets);
+
+        return $targetsJS;
+    }
+
+    /**
+     * @return string
+     */
+    private function events()
+    {
+        $className = get_class($this);
+        $actions = array();
+        $ref = new \ReflectionClass($className);
+        $f = $ref->getFileName();
+        if (false !== $f) {
+            $parsed = KoncertoAnnotation::parseClass($f);
+            foreach ($parsed as $classProp => $annotations) {
+                $parts = explode('::', $classProp);
+                $propName = array_pop($parts);
+                /** @var array<array-key, mixed> $annotations */
+                if (!empty($propName) && array_key_exists('liveAction()', $annotations)) {
+                    $actions[$propName] = $annotations['liveAction()'];
+                }
+            }
+        }
+
+        $events = array();
+        foreach ($actions as $actionName => $action) {
+            array_push($events, sprintf(
+                <<<JS
+                controller.on(%s, function () {
+                    var state = {};
+                    for (var key in controller.targets) {
+                        state[key] = controller.targets[key].get();
+                    }
+                    impulsus.xhr(location.href, function (response) {
+                        var state = JSON.parse(response);
+                        if ('object' === typeof state) {
+                            for (var key in state) {
+                                if (key in controller.targets) {
+                                    controller.targets[key].set(state[key]);
+                                }
+                            }
+                        }
+                    }, 'POST', %s + JSON.stringify(state), 'application/x-www-form-urlencoded');
+                });
+JS
+                ,
+                json_encode($action['name']),
+                json_encode('_action=' . $actionName . '&_live=')
+            ));
+        }
+        $eventsJS = implode("\r\n            ", $events);
+
+        return $eventsJS;
+    }
+}
+
+
 // src/Koncerto/KoncertoRequest.php
 
 class KoncertoRequest
@@ -311,8 +642,15 @@ class KoncertoRequest
         $hasRequestUri = array_key_exists('REQUEST_URI', $_SERVER);
         $requestUri = $hasRequestUri ? $_SERVER['REQUEST_URI'] : null;
 
+        $hasQueryString = array_key_exists('QUERY_STRING', $_SERVER);
+        $queryString = $hasQueryString ? $_SERVER['QUERY_STRING'] : null;
+
         $this->pathName = is_string($pathInfo) ? $pathInfo : '';
         $this->pathName = is_string($requestUri) ? $requestUri : $this->pathName;
+
+        if (!empty($queryString) && is_string($queryString)) {
+            $this->pathName = str_replace('?' . $queryString, '', $this->pathName);
+        }
 
         if ('/' !== substr($this->pathName, -1)) {
             $this->pathName .= '/';
@@ -322,7 +660,7 @@ class KoncertoRequest
         $root = $_SERVER['DOCUMENT_ROOT'];
 
         /** @var string */
-        $documentRoot = $koncerto->getConfig('documentRoot');
+        $documentRoot = $koncerto->getDocumentRoot();
 
         $path = str_replace($root, '', $documentRoot);
 
@@ -336,6 +674,27 @@ class KoncertoRequest
         /** @var string $src */
         $src = $autoload['App\\'];
         $this->src = $documentRoot . '/' . $src;
+    }
+
+    /**
+     * @return string
+     */
+    public function getPathInfo()
+    {
+        return $this->pathName;
+    }
+
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function get($key)
+    {
+        if (array_key_exists($key, $_REQUEST)) {
+            return $_REQUEST[$key];
+        }
+
+        return null;
     }
 
     /**
@@ -456,12 +815,27 @@ class KoncertoTbsTemplate implements KoncertoTemplate
 
     public function render($template, $context = array())
     {
-        if (!method_exists($this->tbs, 'LoadTemplate') || !method_exists($this->tbs, 'Show')) {
+        if (
+            !method_exists($this->tbs, 'LoadTemplate') ||
+            !method_exists($this->tbs, 'MergeField') ||
+            !method_exists($this->tbs, 'MergeBlock') ||
+            !method_exists($this->tbs, 'Show') ||
+            !defined('TBS_NOTHING') ||
+            !property_exists($this->tbs, 'Source')
+        ) {
             throw new \Exception('TinyButStrong is not properly installed');
         }
 
         $this->tbs->LoadTemplate($template);
-        $content = $this->tbs->Show();
+        foreach ($context as $k => $v) {
+            if (is_array($v)) {
+                $this->tbs->MergeBlock($k, 'array', $v);
+            } else {
+                $this->tbs->MergeField($k, $v);
+            }
+        }
+        $this->tbs->Show(TBS_NOTHING);
+        $content = $this->tbs->Source;
         $response = new KoncertoResponse();
         $response->setContent($content);
 
@@ -476,7 +850,7 @@ interface KoncertoTemplate
 {
     /**
      * @param string $template
-     * @param ?array<string, mixed> $context
+     * @param array<string, mixed> $context = array()
      * @return KoncertoResponse
      * @throws \Exception
      */

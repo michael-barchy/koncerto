@@ -2,8 +2,6 @@
 
 namespace Koncerto;
 
-use ReflectionClass;
-
 class KoncertoAnnotation
 {
     /**
@@ -11,6 +9,24 @@ class KoncertoAnnotation
      * @return array{name: string} $params
      */
     public static function route($params)
+    {
+        return $params;
+    }
+
+    /**
+     * @param array{name: string} $params
+     * @return array{name: string} $params
+     */
+    public static function liveProp($params)
+    {
+        return $params;
+    }
+
+    /**
+     * @param array{name: string} $params
+     * @return array{name: string} $params
+     */
+    public static function liveAction($params)
     {
         return $params;
     }
@@ -29,11 +45,16 @@ class KoncertoAnnotation
         $parsed = array();
 
         if (class_exists($className, false)) {
-            $ref = new ReflectionClass($className);
-            $methods = $ref->getMethods();
+            $ref = new \ReflectionClass($className);
+            $methods = $ref->getMethods(\ReflectionProperty::IS_PUBLIC);
             foreach ($methods as $method) {
                 $key = $className . '::' . $method->getName();
                 $parsed[$key] = KoncertoAnnotation::parseAnnotation((string)$method->getDocComment());
+            }
+            $props = $ref->getProperties(\ReflectionProperty::IS_PUBLIC);
+            foreach ($props as $prop) {
+                $key = $className . '::' . $prop->getName();
+                $parsed[$key] = KoncertoAnnotation::parseAnnotation((string)$prop->getDocComment());
             }
         }
 

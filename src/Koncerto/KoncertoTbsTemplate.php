@@ -18,12 +18,27 @@ class KoncertoTbsTemplate implements KoncertoTemplate
 
     public function render($template, $context = array())
     {
-        if (!method_exists($this->tbs, 'LoadTemplate') || !method_exists($this->tbs, 'Show')) {
+        if (
+            !method_exists($this->tbs, 'LoadTemplate') ||
+            !method_exists($this->tbs, 'MergeField') ||
+            !method_exists($this->tbs, 'MergeBlock') ||
+            !method_exists($this->tbs, 'Show') ||
+            !defined('TBS_NOTHING') ||
+            !property_exists($this->tbs, 'Source')
+        ) {
             throw new \Exception('TinyButStrong is not properly installed');
         }
 
         $this->tbs->LoadTemplate($template);
-        $content = $this->tbs->Show();
+        foreach ($context as $k => $v) {
+            if (is_array($v)) {
+                $this->tbs->MergeBlock($k, 'array', $v);
+            } else {
+                $this->tbs->MergeField($k, $v);
+            }
+        }
+        $this->tbs->Show(TBS_NOTHING);
+        $content = $this->tbs->Source;
         $response = new KoncertoResponse();
         $response->setContent($content);
 

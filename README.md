@@ -112,3 +112,87 @@ $koncerto = new Koncerto(array(
 echo $koncerto->response();
 ```
 
+### Impulsus
+
+```php
+<?php
+
+namespace App\Controller;
+
+use Koncerto\KoncertoImpulsusController;
+
+class HelloController extends KoncertoImpulsusController
+{
+}
+```
+
+#### Data binding
+
+```php
+<?php
+
+namespace App\Controller;
+
+use Koncerto\KoncertoImpulsusController;
+
+class HelloController extends KoncertoImpulsusController
+{
+    /**
+     * @see K::liveProp() {"name": "ip"}
+     * @var string
+     */
+    public $ip;
+
+    public function postMount()
+    {
+        $this->ip = $_SERVER['REMOTE_ADDR'];
+    }
+}
+```
+
+```html
+<span data-model="ip"></span>
+```
+
+#### Live actions
+
+```php
+    /**
+     * @see K::liveProp() {"name": "counter"}
+     * @var int
+     */
+    public $counter = 0;
+
+    /**
+     * @param array<string, string> $data
+     * @return void
+     */
+    public function postMount($data = array())
+    {
+        $this->counter = isset($data['counter']) ? intval($data['counter']) : 0;
+    }
+
+    /**
+     * @see K::liveAction() {"name": "incrementCounter"}
+     * @return KoncertoResponse
+     */
+    public function incrementCounter()
+    {
+        $this->counter++;
+
+        return $this->json(array('counter' => $this->counter));
+    }
+```
+
+```html
+    <h2>Counter is <span data-model="counter"></span></h2>
+    <button data-action="click->$live#incrementCounter">Increment Counter</button>
+```
+
+## Recommendations
+
+* Template engine :
+    - HereTemplate for simple templates
+    - TinyButStrong for complex templates
+* UX : Bulma (cdn or npm)
+* Live rendering : Impulsus

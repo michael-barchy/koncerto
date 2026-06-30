@@ -39,6 +39,22 @@ class Koncerto
     }
 
     /**
+     * @return string
+     */
+    public function getDocumentRoot()
+    {
+        $root = $this->getConfig('documentRoot');
+
+        if (null === $root || !is_string($root)) {
+            $hasScript = array_key_exists('SCRIPT_FILENAME', $_SERVER);
+            $script = $hasScript && is_string($_SERVER['SCRIPT_FILENAME']) ? $_SERVER['SCRIPT_FILENAME'] : __FILE__;
+            $root = dirname($script);
+        }
+
+        return $root;
+    }
+
+    /**
      * @return void
      */
     private function autoload()
@@ -46,7 +62,8 @@ class Koncerto
         /** @var array<string, string> */
         $autoload = array_key_exists('autoload', $this->config) ? (array)$this->config['autoload'] : array();
         $autoload = array_flip($autoload);
-        spl_autoload_register(function ($class) use ($autoload) {
+        $root = $this->getDocumentRoot();
+        spl_autoload_register(function ($class) use ($autoload, $root) {
             if (class_exists($class, false)) {
                 return;
             }
@@ -54,26 +71,26 @@ class Koncerto
             $mapping = array_filter($autoload, function ($prefix) use ($class) {
                 return 0 === strpos($class, $prefix);
             });
+
             $prefix = array_values($mapping);
             $prefix = array_shift($prefix);
             if (null === $prefix) {
                 $prefix = '';
             }
+
             $mapping = array_flip($mapping);
             $src = array_shift($mapping);
             if (null === $src) {
                 return;
             }
 
-            $hasScript = array_key_exists('SCRIPT_FILENAME', $_SERVER);
-            $script = $hasScript && is_string($_SERVER['SCRIPT_FILENAME']) ? $_SERVER['SCRIPT_FILENAME'] : __FILE__;
-            $root = dirname($script);
             $classFile = sprintf(
                 '%s/%s/%s',
                 $root,
                 $src,
                 preg_replace('/\\\/', '/', str_replace($prefix, '', $class)) . '.php'
             );
+
             $classPath = realpath($classFile);
             if (false !== $classPath && is_file($classPath)) {
                 require_once($classPath);
@@ -116,8 +133,17 @@ class Koncerto
         }
 
         $match = $request->match();
+
         if (null === $match) {
-            return null;
+            $response = $this->asset($request);
+
+            if (null === $response) {
+                return null;
+            }
+
+            $this->headers($response);
+
+            return $response->getContent();
         }
 
         $parts = explode('::', $match);
@@ -135,8 +161,65 @@ class Koncerto
         $o = new $class($this);
         $response = $o->$method();
 
-        header('Content-type: ' . $response->getContentType());
+        $this->headers($response);
 
         return $response->getContent();
+    }
+
+    /**
+     * @param KoncertoResponse $response
+     * @return void
+     */
+    private function headers($response)
+    {
+        header('Content-type: ' . $response->getContentType());
+    }
+
+    /**
+     * @param KoncertoRequest $request
+     * @return ?KoncertoResponse
+     */
+    private function asset($request)
+    {
+        $file = '.' . $request->getPathInfo();
+        if ('/' === substr($file, -1)) {
+            $file = substr($file, 0, strlen($file) - 1);
+        }
+
+        if (!is_file($file)) {
+            $parts = explode('/', $file);
+            array_shift($parts);
+            array_shift($parts);
+            $root = $this->getDocumentRoot();
+
+            $file = $root . '/' . implode('/', $parts);
+        }
+
+        if (!is_file($file)) {
+            return null;
+        }
+
+        $assetTypes = array(
+            'text\/.*',
+            'image\/.*',
+            'video\/.*',
+            'application\/json'
+        );
+        $contentType = mime_content_type($file);
+        if (false === $contentType) {
+            $contentType = 'text/plain';
+        }
+
+        foreach ($assetTypes as $type) {
+            if (preg_match('/' . $type . '/', $contentType)) {
+                $response = new KoncertoResponse();
+                $response->setContentType($contentType);
+                $response->setContent((string)file_get_contents($file));
+
+                return $response;
+            }
+        }
+
+        return null;
     }
 }

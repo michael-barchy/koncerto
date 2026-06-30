@@ -24,8 +24,15 @@ class KoncertoRequest
         $hasRequestUri = array_key_exists('REQUEST_URI', $_SERVER);
         $requestUri = $hasRequestUri ? $_SERVER['REQUEST_URI'] : null;
 
+        $hasQueryString = array_key_exists('QUERY_STRING', $_SERVER);
+        $queryString = $hasQueryString ? $_SERVER['QUERY_STRING'] : null;
+
         $this->pathName = is_string($pathInfo) ? $pathInfo : '';
         $this->pathName = is_string($requestUri) ? $requestUri : $this->pathName;
+
+        if (!empty($queryString) && is_string($queryString)) {
+            $this->pathName = str_replace('?' . $queryString, '', $this->pathName);
+        }
 
         if ('/' !== substr($this->pathName, -1)) {
             $this->pathName .= '/';
@@ -35,7 +42,7 @@ class KoncertoRequest
         $root = $_SERVER['DOCUMENT_ROOT'];
 
         /** @var string */
-        $documentRoot = $koncerto->getConfig('documentRoot');
+        $documentRoot = $koncerto->getDocumentRoot();
 
         $path = str_replace($root, '', $documentRoot);
 
@@ -49,6 +56,27 @@ class KoncertoRequest
         /** @var string $src */
         $src = $autoload['App\\'];
         $this->src = $documentRoot . '/' . $src;
+    }
+
+    /**
+     * @return string
+     */
+    public function getPathInfo()
+    {
+        return $this->pathName;
+    }
+
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function get($key)
+    {
+        if (array_key_exists($key, $_REQUEST)) {
+            return $_REQUEST[$key];
+        }
+
+        return null;
     }
 
     /**
