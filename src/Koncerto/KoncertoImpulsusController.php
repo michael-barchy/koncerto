@@ -111,8 +111,8 @@ window.addEventListener('impulsus:controller', function (event) {
             }));
 
             impulsus.controller(function (controller) {
-                {$targetsJS}
-                {$eventsJS}
+{$targetsJS}
+{$eventsJS}
             }, event);
         }
     })(window.Impulsus);
@@ -151,7 +151,7 @@ JS;
                 json_encode($this->{$propName})
             ));
         }
-        $targetsJS = implode("\r\n            ", $targets);
+        $targetsJS = implode("\r\n", $targets);
 
         return $targetsJS;
     }
@@ -181,29 +181,40 @@ JS;
         foreach ($actions as $actionName => $action) {
             array_push($events, sprintf(
                 <<<JS
-                controller.on(%s, function () {
+                controller.on(%s, function (param) {
                     var state = {};
                     for (var key in controller.targets) {
-                        state[key] = controller.targets[key].get();
+                        var attr = controller.targets[key].attr('data-model-attr');
+                        if (attr) {
+                            state[key] = controller.targets[key].attr(attr);
+                        } else {
+                            state[key] = controller.targets[key].get();
+                        }
                     }
+                    var params = '&_param=' + param + '&_live=' + JSON.stringify(state);
                     impulsus.xhr(location.href, function (response) {
                         var state = JSON.parse(response);
                         if ('object' === typeof state) {
                             for (var key in state) {
                                 if (key in controller.targets) {
-                                    controller.targets[key].set(state[key]);
+                                    var attr = controller.targets[key].attr('data-model-attr');
+                                    if (attr) {
+                                        controller.targets[key].attr(attr, state[key]);
+                                    } else {
+                                        controller.targets[key].set(state[key]);
+                                    }
                                 }
                             }
                         }
-                    }, 'POST', %s + JSON.stringify(state), 'application/x-www-form-urlencoded');
+                    }, 'POST', %s + params, 'application/x-www-form-urlencoded');
                 });
 JS
                 ,
                 json_encode($action['name']),
-                json_encode('_action=' . $actionName . '&_live=')
+                json_encode('_action=' . $actionName)
             ));
         }
-        $eventsJS = implode("\r\n            ", $events);
+        $eventsJS = implode("\r\n", $events);
 
         return $eventsJS;
     }

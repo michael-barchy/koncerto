@@ -189,6 +189,53 @@ class HelloController extends KoncertoImpulsusController
     <button data-action="click->$live#incrementCounter">Increment Counter</button>
 ```
 
+### ORM
+
+#### Entity
+
+```php
+<?php
+
+namespace App\Entity;
+use Koncerto\KoncertoAnnotation as K;
+
+/**
+ * @see K::entity()
+ */
+class Task
+{
+    /** @var int */
+    public $id;
+
+    /** @var string */
+    public $description;
+
+    /** @var bool */
+    public $done = false;
+}
+```
+
+#### EntityManager
+
+```php
+koncerto = new Koncerto(array(
+    'entityManager' => array(
+        'default' => 'sqlite:///' . __DIR__ . '/db.sqlite'
+    )
+));
+```
+
+```php
+$tasks = $this->getEntityManager()->findAll(Task::class);
+
+$task = $this->getEntityManager()->find(Task::class, $id);
+
+$task->done = true;
+$this->getEntityManager()->persist(Task::class, $task);
+
+$this->getEntityManager()->remove(Task::class, $task->id);
+```
+
 ## Recommendations
 
 * Template engine :
@@ -196,3 +243,4 @@ class HelloController extends KoncertoImpulsusController
     - TinyButStrong for complex templates
 * UX : Bulma (cdn or npm)
 * Live rendering : Impulsus
+* ORM : PDO (fallbacks for older databases extensions are in the roadmap)

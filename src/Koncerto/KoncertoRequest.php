@@ -39,10 +39,10 @@ class KoncertoRequest
         }
 
         /** @var string */
-        $root = $_SERVER['DOCUMENT_ROOT'];
+        $documentRoot = $koncerto->getDocumentRoot();
 
         /** @var string */
-        $documentRoot = $koncerto->getDocumentRoot();
+        $root = array_key_exists('DOCUMENT_ROOT', $_SERVER) ? $_SERVER['DOCUMENT_ROOT'] : $documentRoot;
 
         $path = str_replace($root, '', $documentRoot);
 

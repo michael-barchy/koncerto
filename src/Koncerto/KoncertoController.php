@@ -16,6 +16,15 @@ class KoncertoController
     }
 
     /**
+     * @param ?string $key
+     * @return KoncertoEntityManager
+     */
+    public function getEntityManager($key = null)
+    {
+        return new KoncertoEntityManager($this->koncerto, $key);
+    }
+
+    /**
      * @param mixed $data
      * @return KoncertoResponse
      */

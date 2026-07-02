@@ -32,6 +32,15 @@ class KoncertoAnnotation
     }
 
     /**
+     * @param array{table?: string, key?: string} $params
+     * @return array{table?: string, key?: string} $params
+     */
+    public static function entity($params)
+    {
+        return $params;
+    }
+
+    /**
      * @param string $file
      * @return array<string, mixed>
      */
@@ -68,14 +77,18 @@ class KoncertoAnnotation
     public static function parseAnnotation($comment)
     {
         $parsed = array();
-        $lines = explode('\n', $comment);
+        $lines = preg_split('/(\n|\r)/', $comment);
+        if (false === $lines) {
+            $lines = explode('\n', $comment);
+        }
         foreach ($lines as $line) {
             $line = trim($line);
+            $line = (string)preg_replace('/(\n|\r)/', '', $line);
             $see = array();
-            if (preg_match('/@see ([^ ]*) (.*)/', $line, $see)) {
+            if (preg_match('/@see ([^ ]*)(.*)/', $line, $see)) {
                 $parts = explode('::', $see[1]);
                 $methodName = array_pop($parts);
-                $parsed[$methodName] = (array)json_decode($see[2], true);
+                $parsed[$methodName] = (array)json_decode(trim($see[2]), true);
             }
         }
 
