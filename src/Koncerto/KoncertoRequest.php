@@ -34,6 +34,10 @@ class KoncertoRequest
             $this->pathName = str_replace('?' . $queryString, '', $this->pathName);
         }
 
+        if (null !== $this->get('_route') && is_string($this->get('_route'))) {
+            $this->pathName = $this->get('_route');
+        }
+
         if ('/' !== substr($this->pathName, -1)) {
             $this->pathName .= '/';
         }

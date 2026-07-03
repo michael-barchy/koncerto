@@ -17,12 +17,33 @@ class Koncerto
             return;
         }
 
+        $hasScriptFilename = array_key_exists('SCRIPT_FILENAME', $_SERVER) && is_string($_SERVER['SCRIPT_FILENAME']);
+        $scriptFilename = $hasScriptFilename ? $_SERVER['SCRIPT_FILENAME'] : __FILE__;
+        if (!array_key_exists('DOCUMENT_ROOT', $_SERVER) && $hasScriptFilename) {
+            $_SERVER['DOCUMENT_ROOT'] = dirname($scriptFilename);
+        }
+
         if (is_string($config) && '.ini' === strrchr($config, '.')) {
-            $config = (array)parse_ini_file($config, true);
+            $ini = (string)file_get_contents($config);
+            foreach ($_SERVER as $k => $v) {
+                if (is_array($v)) {
+                    $v = json_encode($v);
+                }
+                /** @var string $v */
+                $ini = str_replace('%' . $k . '%', $v, $ini);
+            }
+            $config = (array)parse_ini_string($ini, true);
         }
 
         if (is_string($config) && '.json' === strrchr($config, '.')) {
             $json = (string)file_get_contents($config);
+            foreach ($_SERVER as $k => $v) {
+                if (is_array($v)) {
+                    $v = json_encode($v);
+                }
+                /** @var string $v */
+                $json = str_replace('%' . $k . '%', $v, $json);
+            }
             $config = (array)json_decode($json, true);
         }
 
@@ -91,7 +112,7 @@ class Koncerto
                 preg_replace('/\\\/', '/', str_replace($prefix, '', $class)) . '.php'
             );
 
-            $classPath = realpath($classFile);
+            $classPath = 'phar://' === substr($classFile, 0, 7) ? $classFile : realpath($classFile);
             if (false !== $classPath && is_file($classPath)) {
                 require_once($classPath);
             }
@@ -372,7 +393,7 @@ class KoncertoController
             throw new \Exception('No template engine defined or template engine not found');
         }
 
-        $e = new $engine();
+        $e = new $engine($this->koncerto);
         if (!$e instanceof KoncertoTemplate) {
             throw new \Exception('Invalid template engine');
         }
@@ -735,7 +756,7 @@ class KoncertoImpulsusController extends KoncertoController
 
         $response = parent::render($template, $context);
         $js = $this->getConfig('impulsus');
-        if (null == $js || !is_string($js)) {
+        if (null === $js || !is_string($js)) {
             $js = '/impulsus/impulsus.js';
         }
 
@@ -953,6 +974,10 @@ class KoncertoRequest
             $this->pathName = str_replace('?' . $queryString, '', $this->pathName);
         }
 
+        if (null !== $this->get('_route') && is_string($this->get('_route'))) {
+            $this->pathName = $this->get('_route');
+        }
+
         if ('/' !== substr($this->pathName, -1)) {
             $this->pathName .= '/';
         }
@@ -1105,8 +1130,16 @@ class KoncertoTbsTemplate implements KoncertoTemplate
     /** @var object */
     private $tbs;
 
-    public function __construct()
+    /** @var Koncerto */
+    private $koncerto;
+
+    /**
+     * @param Koncerto $koncerto
+     */
+    public function __construct($koncerto)
     {
+        $this->koncerto = $koncerto;
+
         if (!class_exists('clsTinyButStrong')) {
             throw new \Exception('TinyButStrong is not installed');
         }
@@ -1127,7 +1160,7 @@ class KoncertoTbsTemplate implements KoncertoTemplate
             throw new \Exception('TinyButStrong is not properly installed');
         }
 
-        $this->tbs->LoadTemplate($template);
+        $this->tbs->LoadTemplate($this->koncerto->getDocumentRoot() . '/' . $template);
         foreach ($context as $k => $v) {
             if (is_array($v)) {
                 $this->tbs->MergeBlock($k, 'array', $v);

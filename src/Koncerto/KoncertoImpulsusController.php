@@ -37,7 +37,7 @@ class KoncertoImpulsusController extends KoncertoController
 
         $response = parent::render($template, $context);
         $js = $this->getConfig('impulsus');
-        if (null == $js || !is_string($js)) {
+        if (null === $js || !is_string($js)) {
             $js = '/impulsus/impulsus.js';
         }
 

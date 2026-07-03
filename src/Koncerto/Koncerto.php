@@ -17,12 +17,33 @@ class Koncerto
             return;
         }
 
+        $hasScriptFilename = array_key_exists('SCRIPT_FILENAME', $_SERVER) && is_string($_SERVER['SCRIPT_FILENAME']);
+        $scriptFilename = $hasScriptFilename ? $_SERVER['SCRIPT_FILENAME'] : __FILE__;
+        if (!array_key_exists('DOCUMENT_ROOT', $_SERVER) && $hasScriptFilename) {
+            $_SERVER['DOCUMENT_ROOT'] = dirname($scriptFilename);
+        }
+
         if (is_string($config) && '.ini' === strrchr($config, '.')) {
-            $config = (array)parse_ini_file($config, true);
+            $ini = (string)file_get_contents($config);
+            foreach ($_SERVER as $k => $v) {
+                if (is_array($v)) {
+                    $v = json_encode($v);
+                }
+                /** @var string $v */
+                $ini = str_replace('%' . $k . '%', $v, $ini);
+            }
+            $config = (array)parse_ini_string($ini, true);
         }
 
         if (is_string($config) && '.json' === strrchr($config, '.')) {
             $json = (string)file_get_contents($config);
+            foreach ($_SERVER as $k => $v) {
+                if (is_array($v)) {
+                    $v = json_encode($v);
+                }
+                /** @var string $v */
+                $json = str_replace('%' . $k . '%', $v, $json);
+            }
             $config = (array)json_decode($json, true);
         }
 
@@ -91,7 +112,7 @@ class Koncerto
                 preg_replace('/\\\/', '/', str_replace($prefix, '', $class)) . '.php'
             );
 
-            $classPath = realpath($classFile);
+            $classPath = 'phar://' === substr($classFile, 0, 7) ? $classFile : realpath($classFile);
             if (false !== $classPath && is_file($classPath)) {
                 require_once($classPath);
             }

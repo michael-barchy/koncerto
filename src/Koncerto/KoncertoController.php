@@ -50,7 +50,7 @@ class KoncertoController
             throw new \Exception('No template engine defined or template engine not found');
         }
 
-        $e = new $engine();
+        $e = new $engine($this->koncerto);
         if (!$e instanceof KoncertoTemplate) {
             throw new \Exception('Invalid template engine');
         }

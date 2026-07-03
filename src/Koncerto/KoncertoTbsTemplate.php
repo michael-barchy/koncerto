@@ -7,8 +7,16 @@ class KoncertoTbsTemplate implements KoncertoTemplate
     /** @var object */
     private $tbs;
 
-    public function __construct()
+    /** @var Koncerto */
+    private $koncerto;
+
+    /**
+     * @param Koncerto $koncerto
+     */
+    public function __construct($koncerto)
     {
+        $this->koncerto = $koncerto;
+
         if (!class_exists('clsTinyButStrong')) {
             throw new \Exception('TinyButStrong is not installed');
         }
@@ -29,7 +37,7 @@ class KoncertoTbsTemplate implements KoncertoTemplate
             throw new \Exception('TinyButStrong is not properly installed');
         }
 
-        $this->tbs->LoadTemplate($template);
+        $this->tbs->LoadTemplate($this->koncerto->getDocumentRoot() . '/' . $template);
         foreach ($context as $k => $v) {
             if (is_array($v)) {
                 $this->tbs->MergeBlock($k, 'array', $v);
