@@ -18,19 +18,22 @@ class KoncertoRequest
      */
     public function __construct($koncerto)
     {
-        $hasPathInfo = array_key_exists('PATH_INFO', $_SERVER);
+        $hasPathInfo = array_key_exists('PATH_INFO', $_SERVER) && is_string($_SERVER['PATH_INFO']);
         $pathInfo = $hasPathInfo ? $_SERVER['PATH_INFO'] : null;
 
-        $hasRequestUri = array_key_exists('REQUEST_URI', $_SERVER);
+        $hasRequestUri = array_key_exists('REQUEST_URI', $_SERVER) && is_string($_SERVER['REQUEST_URI']);
         $requestUri = $hasRequestUri ? $_SERVER['REQUEST_URI'] : null;
 
-        $hasQueryString = array_key_exists('QUERY_STRING', $_SERVER);
+        $hasQueryString = array_key_exists('QUERY_STRING', $_SERVER) && is_string($_SERVER['QUERY_STRING']);
         $queryString = $hasQueryString ? $_SERVER['QUERY_STRING'] : null;
+
+        $isQueryString = is_string($queryString) && is_string($requestUri);
+        $requestUri = $isQueryString ? str_replace('?' . $queryString, '', $requestUri) : $requestUri;
 
         $this->pathName = is_string($pathInfo) ? $pathInfo : '';
         $this->pathName = is_string($requestUri) ? $requestUri : $this->pathName;
 
-        if (!empty($queryString) && is_string($queryString)) {
+        if (!empty($queryString)) {
             $this->pathName = str_replace('?' . $queryString, '', $this->pathName);
         }
 
@@ -40,6 +43,12 @@ class KoncertoRequest
 
         if ('/' !== substr($this->pathName, -1)) {
             $this->pathName .= '/';
+        }
+
+        $appPrefix = $koncerto->getConfig('appPrefix');
+        if (is_string($appPrefix) && 0 === strpos($this->pathName, $appPrefix)) {
+            $this->pathName = substr($this->pathName, strlen($appPrefix));
+            $_SERVER['APP_PREFIX'] = $appPrefix;
         }
 
         /** @var string */

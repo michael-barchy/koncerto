@@ -37,8 +37,10 @@ class KoncertoImpulsusController extends KoncertoController
 
         $response = parent::render($template, $context);
         $js = $this->getConfig('impulsus');
+        /** @var string */
+        $appPrefix = $this->getConfig('appPrefix', '');
         if (null === $js || !is_string($js)) {
-            $js = '/impulsus/impulsus.js';
+            $js = $appPrefix . '/impulsus/impulsus.js';
         }
 
         $impulsus = sprintf(
@@ -177,6 +179,9 @@ JS;
             }
         }
 
+        $hasBootstrap = array_key_exists('BOOTSTRAP', $_SERVER) && is_string($_SERVER['BOOTSTRAP']);
+        $bootstrap = $hasBootstrap ? $_SERVER['BOOTSTRAP'] : '';
+
         $events = array();
         foreach ($actions as $actionName => $action) {
             array_push($events, sprintf(
@@ -191,8 +196,15 @@ JS;
                             state[key] = controller.targets[key].get();
                         }
                     }
-                    var params = '&_param=' + param + '&_live=' + JSON.stringify(state);
-                    impulsus.xhr(location.href, function (response) {
+                    var bootstrap = '{$bootstrap}';
+                    var route = '{$this->getRequest()->getPathInfo()}';
+                    var params = '&' + [
+                        '_param=' + encodeURIComponent(param),
+                        '_live=' + encodeURIComponent(JSON.stringify(state))
+                    ].join('&');
+                    var url = new URL(location.href);
+                    console.debug(url.toString());
+                    impulsus.xhr(url.toString(), function (response) {
                         var state = JSON.parse(response);
                         if ('object' === typeof state) {
                             for (var key in state) {

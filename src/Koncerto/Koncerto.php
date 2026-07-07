@@ -226,7 +226,8 @@ class Koncerto
             'video\/.*',
             'application\/json'
         );
-        $contentType = mime_content_type($file);
+        $ext = substr((string)strrchr($file, '.'), 1);
+        $contentType = function_exists('mime_content_type') ? mime_content_type($file) : 'application/' . $ext;
         if (false === $contentType) {
             $contentType = 'text/plain';
         }

@@ -60,11 +60,14 @@ class KoncertoController
 
     /**
      * @param string $key
+     * @param mixed $default
      * @return mixed
      */
-    public function getConfig($key)
+    public function getConfig($key, $default = null)
     {
-        $this->koncerto->getConfig($key);
+        $value = $this->koncerto->getConfig($key);
+
+        return null === $value ? $default : $value;
     }
 
     /**

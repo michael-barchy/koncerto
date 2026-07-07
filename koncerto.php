@@ -226,7 +226,8 @@ class Koncerto
             'video\/.*',
             'application\/json'
         );
-        $contentType = mime_content_type($file);
+        $ext = substr((string)strrchr($file, '.'), 1);
+        $contentType = function_exists('mime_content_type') ? mime_content_type($file) : 'application/' . $ext;
         if (false === $contentType) {
             $contentType = 'text/plain';
         }
@@ -403,11 +404,14 @@ class KoncertoController
 
     /**
      * @param string $key
+     * @param mixed $default
      * @return mixed
      */
-    public function getConfig($key)
+    public function getConfig($key, $default = null)
     {
-        $this->koncerto->getConfig($key);
+        $value = $this->koncerto->getConfig($key);
+
+        return null === $value ? $default : $value;
     }
 
     /**
@@ -756,8 +760,10 @@ class KoncertoImpulsusController extends KoncertoController
 
         $response = parent::render($template, $context);
         $js = $this->getConfig('impulsus');
+        /** @var string */
+        $appPrefix = $this->getConfig('appPrefix', '');
         if (null === $js || !is_string($js)) {
-            $js = '/impulsus/impulsus.js';
+            $js = $appPrefix . '/impulsus/impulsus.js';
         }
 
         $impulsus = sprintf(
@@ -896,6 +902,9 @@ JS;
             }
         }
 
+        $hasBootstrap = array_key_exists('BOOTSTRAP', $_SERVER) && is_string($_SERVER['BOOTSTRAP']);
+        $bootstrap = $hasBootstrap ? $_SERVER['BOOTSTRAP'] : '';
+
         $events = array();
         foreach ($actions as $actionName => $action) {
             array_push($events, sprintf(
@@ -910,8 +919,15 @@ JS;
                             state[key] = controller.targets[key].get();
                         }
                     }
-                    var params = '&_param=' + param + '&_live=' + JSON.stringify(state);
-                    impulsus.xhr(location.href, function (response) {
+                    var bootstrap = '{$bootstrap}';
+                    var route = '{$this->getRequest()->getPathInfo()}';
+                    var params = '&' + [
+                        '_param=' + encodeURIComponent(param),
+                        '_live=' + encodeURIComponent(JSON.stringify(state))
+                    ].join('&');
+                    var url = new URL(location.href);
+                    console.debug(url.toString());
+                    impulsus.xhr(url.toString(), function (response) {
                         var state = JSON.parse(response);
                         if ('object' === typeof state) {
                             for (var key in state) {
@@ -958,19 +974,22 @@ class KoncertoRequest
      */
     public function __construct($koncerto)
     {
-        $hasPathInfo = array_key_exists('PATH_INFO', $_SERVER);
+        $hasPathInfo = array_key_exists('PATH_INFO', $_SERVER) && is_string($_SERVER['PATH_INFO']);
         $pathInfo = $hasPathInfo ? $_SERVER['PATH_INFO'] : null;
 
-        $hasRequestUri = array_key_exists('REQUEST_URI', $_SERVER);
+        $hasRequestUri = array_key_exists('REQUEST_URI', $_SERVER) && is_string($_SERVER['REQUEST_URI']);
         $requestUri = $hasRequestUri ? $_SERVER['REQUEST_URI'] : null;
 
-        $hasQueryString = array_key_exists('QUERY_STRING', $_SERVER);
+        $hasQueryString = array_key_exists('QUERY_STRING', $_SERVER) && is_string($_SERVER['QUERY_STRING']);
         $queryString = $hasQueryString ? $_SERVER['QUERY_STRING'] : null;
+
+        $isQueryString = is_string($queryString) && is_string($requestUri);
+        $requestUri = $isQueryString ? str_replace('?' . $queryString, '', $requestUri) : $requestUri;
 
         $this->pathName = is_string($pathInfo) ? $pathInfo : '';
         $this->pathName = is_string($requestUri) ? $requestUri : $this->pathName;
 
-        if (!empty($queryString) && is_string($queryString)) {
+        if (!empty($queryString)) {
             $this->pathName = str_replace('?' . $queryString, '', $this->pathName);
         }
 
@@ -980,6 +999,12 @@ class KoncertoRequest
 
         if ('/' !== substr($this->pathName, -1)) {
             $this->pathName .= '/';
+        }
+
+        $appPrefix = $koncerto->getConfig('appPrefix');
+        if (is_string($appPrefix) && 0 === strpos($this->pathName, $appPrefix)) {
+            $this->pathName = substr($this->pathName, strlen($appPrefix));
+            $_SERVER['APP_PREFIX'] = $appPrefix;
         }
 
         /** @var string */
