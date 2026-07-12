@@ -72,9 +72,10 @@ class KoncertoAnnotation
 
     /**
      * @param string $comment
+     * @param string $prefix
      * @return array<string, mixed>
      */
-    public static function parseAnnotation($comment)
+    public static function parseAnnotation($comment, $prefix = 'see')
     {
         $parsed = array();
         $lines = preg_split('/(\n|\r)/', $comment);
@@ -85,7 +86,7 @@ class KoncertoAnnotation
             $line = trim($line);
             $line = (string)preg_replace('/(\n|\r)/', '', $line);
             $see = array();
-            if (preg_match('/@see ([^ ]*)(.*)/', $line, $see)) {
+            if (preg_match('/@' . $prefix . ' ([^ ]*)(.*)/', $line, $see)) {
                 $parts = explode('::', $see[1]);
                 $methodName = array_pop($parts);
                 $parsed[$methodName] = (array)json_decode(trim($see[2]), true);

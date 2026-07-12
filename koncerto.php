@@ -319,9 +319,10 @@ class KoncertoAnnotation
 
     /**
      * @param string $comment
+     * @param string $prefix
      * @return array<string, mixed>
      */
-    public static function parseAnnotation($comment)
+    public static function parseAnnotation($comment, $prefix = 'see')
     {
         $parsed = array();
         $lines = preg_split('/(\n|\r)/', $comment);
@@ -332,7 +333,7 @@ class KoncertoAnnotation
             $line = trim($line);
             $line = (string)preg_replace('/(\n|\r)/', '', $line);
             $see = array();
-            if (preg_match('/@see ([^ ]*)(.*)/', $line, $see)) {
+            if (preg_match('/@' . $prefix . ' ([^ ]*)(.*)/', $line, $see)) {
                 $parts = explode('::', $see[1]);
                 $methodName = array_pop($parts);
                 $parsed[$methodName] = (array)json_decode(trim($see[2]), true);
@@ -437,6 +438,15 @@ class KoncertoEntityManager
     /** @var \PDO */
     private $connection;
 
+    /** @var string */
+    private $src;
+
+    /** @var string */
+    private $cache;
+
+    /** @var array<string, array<array{name?: mixed, key?: mixed}>> */
+    private $tableCache = array();
+
     /**
      * @param Koncerto $koncerto
      * @param ?string $key
@@ -461,6 +471,21 @@ class KoncertoEntityManager
         }
 
         $this->dsn = $entityManagers[$key];
+
+        /** @var string */
+        $documentRoot = $koncerto->getDocumentRoot();
+
+        /** @var array<string, string> */
+        $autoload = $koncerto->getConfig('autoload');
+
+        /** @var string $src */
+        $src = $autoload['App\\'];
+        $this->src = $documentRoot . '/' . $src;
+
+        if (!is_dir('cache')) {
+            mkdir('cache');
+        }
+        $this->cache = 'cache/orm.json';
     }
 
     /**
@@ -622,6 +647,21 @@ class KoncertoEntityManager
      */
     private function getTableName($entity)
     {
+        $f = str_replace('\\', '/', str_replace('App\\', $this->src . '/', $entity)) . '.php';
+        if (empty($this->tableCache) && is_file($this->cache) && filemtime($this->cache) > filemtime($f)) {
+            /** @var array<string, array<string, array{name?: mixed, key?: mixed}>> */
+            $json = (array)json_decode((string)file_get_contents($this->cache), true);
+            $this->tableCache = $json;
+        }
+
+        $hasCache = array_key_exists($this->dsn, $this->tableCache);
+        $hasCache = $hasCache && array_key_exists($entity, $this->tableCache[$this->dsn]);
+        $hasTableName = $hasCache && array_key_exists('name', $this->tableCache[$this->dsn][$entity]);
+        $hasTableName = $hasTableName && is_string($this->tableCache[$this->dsn][$entity]['name']);
+        if ($hasCache && $hasTableName && filemtime($this->cache) > filemtime($f)) {
+            return $this->tableCache[$this->dsn][$entity]['name'];
+        }
+
         $ref = new \ReflectionClass($entity);
         $docComment = $ref->getDocComment();
 
@@ -636,8 +676,12 @@ class KoncertoEntityManager
         }
 
         $hasTable = array_key_exists('table', $parsed[$key]) && is_string($parsed[$key]['table']);
+        $tableName = $hasTable ? $parsed[$key]['table'] : strtolower($ref->getShortName());
 
-        return $hasTable ? $parsed[$key]['table'] : strtolower($ref->getShortName());
+        $this->tableCache[$this->dsn][$entity]['name'] = $tableName;
+        file_put_contents($this->cache, json_encode($this->tableCache));
+
+        return $tableName;
     }
 
     /**
@@ -648,6 +692,21 @@ class KoncertoEntityManager
      */
     private function getTableKey($entity)
     {
+        $f = str_replace('\\', '/', str_replace('App\\', $this->src . '/', $entity)) . '.php';
+        if (empty($this->tableCache) && is_file($this->cache) && filemtime($this->cache) > filemtime($f)) {
+            /** @var array<string, array<string, array{name?: mixed, key?: mixed}>> */
+            $json = (array)json_decode((string)file_get_contents($this->cache), true);
+            $this->tableCache = $json;
+        }
+
+        $hasCache = array_key_exists($this->dsn, $this->tableCache);
+        $hasCache = $hasCache && array_key_exists($entity, $this->tableCache[$this->dsn]);
+        $hasTableKey = $hasCache && array_key_exists('key', $this->tableCache[$this->dsn][$entity]);
+        $hasTableKey = $hasTableKey && is_string($this->tableCache[$this->dsn][$entity]['key']);
+        if ($hasCache && $hasTableKey && filemtime($this->cache) > filemtime($f)) {
+            return $this->tableCache[$this->dsn][$entity]['key'];
+        }
+
         $ref = new \ReflectionClass($entity);
         $docComment = $ref->getDocComment();
 
@@ -662,8 +721,12 @@ class KoncertoEntityManager
         }
 
         $hasKey = array_key_exists('key', $parsed[$key]) && is_string($parsed[$key]['key']);
+        $tableKey = $hasKey ? $parsed[$key]['key'] : 'id';
 
-        return $hasKey ? $parsed[$key]['key'] : 'id';
+        $this->tableCache[$this->dsn][$entity]['key'] = $tableKey;
+        file_put_contents($this->cache, json_encode($this->tableCache));
+
+        return $tableKey;
     }
 
     /**
@@ -961,13 +1024,16 @@ JS
 class KoncertoRequest
 {
     /** @var string */
-    private $src = '';
+    private $src;
 
     /** @var string */
-    private $pathName = '';
+    private $pathName;
 
     /** @var array<string, mixed> */
     private $routes = array();
+
+    /** @var string */
+    private $cache;
 
     /**
      * @param Koncerto $koncerto
@@ -1025,6 +1091,11 @@ class KoncertoRequest
         /** @var string $src */
         $src = $autoload['App\\'];
         $this->src = $documentRoot . '/' . $src;
+
+        if (!is_dir('cache')) {
+            mkdir('cache');
+        }
+        $this->cache = 'cache/routes.json';
     }
 
     /**
@@ -1072,10 +1143,19 @@ class KoncertoRequest
      */
     private function routes()
     {
+        $d = $this->src . '/Controller/';
+
+        if (is_file($this->cache) && filemtime($d) < filemtime($this->cache)) {
+            /** @var array<string, mixed> */
+            $routes = (array)json_decode($this->cache, true);
+            $this->routes = $routes;
+        } else {
+            $this->routes = array();
+        }
+
         if (empty($this->routes)) {
             $routes = array();
 
-            $d = $this->src . '/Controller/';
             $controllers = scandir($d);
 
             foreach ($controllers as $controller) {
@@ -1091,7 +1171,9 @@ class KoncertoRequest
             }
 
             $this->routes = $routes;
+            file_put_contents($this->cache, json_encode($routes));
         }
+
 
         return $this->routes;
     }

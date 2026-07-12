@@ -5,13 +5,16 @@ namespace Koncerto;
 class KoncertoRequest
 {
     /** @var string */
-    private $src = '';
+    private $src;
 
     /** @var string */
-    private $pathName = '';
+    private $pathName;
 
     /** @var array<string, mixed> */
     private $routes = array();
+
+    /** @var string */
+    private $cache;
 
     /**
      * @param Koncerto $koncerto
@@ -69,6 +72,11 @@ class KoncertoRequest
         /** @var string $src */
         $src = $autoload['App\\'];
         $this->src = $documentRoot . '/' . $src;
+
+        if (!is_dir('cache')) {
+            mkdir('cache');
+        }
+        $this->cache = 'cache/routes.json';
     }
 
     /**
@@ -116,10 +124,19 @@ class KoncertoRequest
      */
     private function routes()
     {
+        $d = $this->src . '/Controller/';
+
+        if (is_file($this->cache) && filemtime($d) < filemtime($this->cache)) {
+            /** @var array<string, mixed> */
+            $routes = (array)json_decode($this->cache, true);
+            $this->routes = $routes;
+        } else {
+            $this->routes = array();
+        }
+
         if (empty($this->routes)) {
             $routes = array();
 
-            $d = $this->src . '/Controller/';
             $controllers = scandir($d);
 
             foreach ($controllers as $controller) {
@@ -135,7 +152,9 @@ class KoncertoRequest
             }
 
             $this->routes = $routes;
+            file_put_contents($this->cache, json_encode($routes));
         }
+
 
         return $this->routes;
     }
