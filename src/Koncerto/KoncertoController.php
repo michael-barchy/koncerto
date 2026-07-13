@@ -71,6 +71,14 @@ class KoncertoController
     }
 
     /**
+     * @return string
+     */
+    public function getDocumentRoot()
+    {
+        return $this->koncerto->getDocumentRoot();
+    }
+
+    /**
      * @return KoncertoRequest
      */
     public function getRequest()
