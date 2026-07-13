@@ -41,19 +41,20 @@ class KoncertoAnnotation
     }
 
     /**
-     * @param string $file
+     * @param ?string $file
+     * @param ?class-string $className
      * @return array<string, mixed>
      */
-    public static function parseClass($file)
+    public static function parseClass($file, $className = null)
     {
-        $nameSpace = basename(dirname($file));
-        $className = 'App\\' . $nameSpace . '\\' . str_replace('.php', '', basename($file));
-
-        include_once($file);
+        if (null !== $file && null === $className) {
+            $nameSpace = basename(dirname($file));
+            $className = 'App\\' . $nameSpace . '\\' . str_replace('.php', '', basename($file));
+        }
 
         $parsed = array();
 
-        if (class_exists($className, false)) {
+        if (null !== $className && class_exists($className, true)) {
             $ref = new \ReflectionClass($className);
             $methods = $ref->getMethods(\ReflectionProperty::IS_PUBLIC);
             foreach ($methods as $method) {

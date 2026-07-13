@@ -151,6 +151,14 @@ class KoncertoRequest
                 }
             }
 
+            $parsed = KoncertoAnnotation::parseClass(null, 'Koncerto\\KoncertoApiController');
+            foreach ($parsed as $classMethod => $annotations) {
+                /** @var array<array-key, mixed> $annotations */
+                if (array_key_exists('route()', $annotations)) {
+                    $routes[$classMethod] = $annotations['route()'];
+                }
+            }
+
             $this->routes = $routes;
             file_put_contents($this->cache, json_encode($routes));
         }
