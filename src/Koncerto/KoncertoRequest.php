@@ -102,18 +102,38 @@ class KoncertoRequest
 
     /**
      * Match request to route
+     * @param array<mixed>|null $args
      * @return ?string
      */
-    public function match()
+    public function match(&$args = array())
     {
         $path = $this->pathName;
 
-        $match = array_filter($this->routes(), function ($route) use ($path) {
+        $routes = array_filter($this->routes(), function ($route) use ($path) {
             /** @var array{name: string} $route */
+            if (is_integer(strpos($route['name'], '%'))) {
+                $format = str_replace('%s', '%[^/]', $route['name']) . '%n';
+                $params = (array)sscanf($path, $format);
+                $params = array_filter($params);
+                $len = intval(array_pop($params));
+
+                return $len === strlen($path) && !empty($params);
+            }
+
             return $path === $route['name'];
         });
 
-        $match = array_keys($match);
+        $match = array_keys($routes);
+
+        $route = array_shift($routes);
+        /** @var array{name: string}|null $route */
+        if (null !== $route && is_integer(strpos($route['name'], '%'))) {
+            $format = str_replace('%s', '%[^/]', $route['name']) . '%n';
+            $args = (array)sscanf($path, $format);
+            $len = intval(array_pop($args));
+            $args = $len === strlen($path) && !empty($args) ? $args : array();
+        }
+
         $match = array_shift($match);
 
         return $match;

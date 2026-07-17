@@ -153,7 +153,8 @@ class Koncerto
             $request = $this->request();
         }
 
-        $match = $request->match();
+        $args = array();
+        $match = $request->match($args);
 
         if (null === $match) {
             $response = $this->asset($request);
@@ -180,7 +181,7 @@ class Koncerto
         }
 
         $o = new $class($this);
-        $response = $o->$method();
+        $response = $o->$method($args);
 
         $this->headers($response);
 
