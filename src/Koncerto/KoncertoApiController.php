@@ -16,6 +16,15 @@ class KoncertoApiController extends KoncertoController
     }
 
     /**
+     * @see K::route() {"name": "/api/docs/"}
+     * @return KoncertoResponse
+     */
+    public function docs()
+    {
+        return $this->json(array());
+    }
+
+    /**
      * @see K::route() {"name": "/api/%s/"}
      * @param array<mixed>|null $args
      * @return KoncertoResponse
