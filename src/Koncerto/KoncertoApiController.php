@@ -21,7 +21,10 @@ class KoncertoApiController extends KoncertoController
      */
     public function docs()
     {
-        return $this->json(array());
+        $response = new KoncertoResponse();
+        $response->setContent('<h1>Under construction</h1>');
+
+        return $response;
     }
 
     /**
