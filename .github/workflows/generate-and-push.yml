@@ -1,0 +1,39 @@
+name: Generate and Push File
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Generate File
+      run: |
+        node build.mjs
+
+    - name: Commit and Push changes
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@://github.com"
+
+        git add koncerto.php
+
+        if git diff --staged --quiet; then
+          echo "No update"
+        else
+          git commit -m "chore: build koncerto.php [skip ci]"
+          git push origin main
+        fi
