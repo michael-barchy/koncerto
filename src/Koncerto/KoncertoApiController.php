@@ -14,4 +14,14 @@ class KoncertoApiController extends KoncertoController
     {
         return $this->json(array());
     }
+
+    /**
+     * @see K::route() {"name": "/api/%s/"}
+     * @param array<mixed>|null $args
+     * @return KoncertoResponse
+     */
+    public function crud($args = array())
+    {
+        return $this->json(array('params' => $args));
+    }
 }
