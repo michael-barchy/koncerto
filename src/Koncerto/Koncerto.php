@@ -225,7 +225,7 @@ class Koncerto
             'text\/.*',
             'image\/.*',
             'video\/.*',
-            'application\/json'
+            'application\/.*'
         );
         $ext = substr((string)strrchr($file, '.'), 1);
         $contentType = function_exists('mime_content_type') ? mime_content_type($file) : 'application/' . $ext;
