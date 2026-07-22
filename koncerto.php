@@ -225,7 +225,7 @@ class Koncerto
             'text\/.*',
             'image\/.*',
             'video\/.*',
-            'application\/json'
+            'application\/.*'
         );
         $ext = substr((string)strrchr($file, '.'), 1);
         $contentType = function_exists('mime_content_type') ? mime_content_type($file) : 'application/' . $ext;
@@ -491,10 +491,16 @@ class KoncertoEntityManager
     private $src;
 
     /** @var string */
-    private $cache;
+    private $tableCacheFile;
 
-    /** @var array<string, array<array{name?: mixed, key?: mixed}>> */
+    /** @var array<string, array<string, array{name?: mixed, key?: mixed}>> */
     private $tableCache = array();
+
+    /** @var string */
+    private $entityCacheFile;
+
+    /** @var array<string, array<string, array<string, mixed>>> */
+    private $entityCache = array();
 
     /**
      * @param Koncerto $koncerto
@@ -534,7 +540,8 @@ class KoncertoEntityManager
         if (!is_dir('cache')) {
             mkdir('cache');
         }
-        $this->cache = 'cache/orm.json';
+        $this->tableCacheFile = 'cache/orm.json';
+        $this->entityCacheFile = 'cache/entities.json';
     }
 
     /**
@@ -576,8 +583,9 @@ class KoncertoEntityManager
         }
 
         $rows = (array)$prepare->fetchAll(\PDO::FETCH_ASSOC);
-        $entities = array_map(function ($row) use ($entity) {
-            return KoncertoEntityManager::hydrate($entity, $row);
+        $em = $this;
+        $entities = array_map(function ($row) use ($em, $entity) {
+            return $em->hydrate($entity, $row);
         }, $rows);
 
         return $entities;
@@ -652,8 +660,7 @@ class KoncertoEntityManager
     }
 
     /**
-     * @template T of object
-     * @param class-string<T> $entity
+     * @param class-string $entity
      * @param mixed $id
      * @return boolean
      */
@@ -689,17 +696,17 @@ class KoncertoEntityManager
     }
 
     /**
-     * @template T of object
-     * @param class-string<T> $entity
+     * @param class-string $entity
      * @return string
      * @throws \Exception
      */
     private function getTableName($entity)
     {
         $f = str_replace('\\', '/', str_replace('App\\', $this->src . '/', $entity)) . '.php';
-        if (empty($this->tableCache) && is_file($this->cache) && filemtime($this->cache) > filemtime($f)) {
+        $cache = $this->tableCacheFile;
+        if (empty($this->tableCache) && is_file($cache) && filemtime($cache) > filemtime($f)) {
             /** @var array<string, array<string, array{name?: mixed, key?: mixed}>> */
-            $json = (array)json_decode((string)file_get_contents($this->cache), true);
+            $json = (array)json_decode((string)file_get_contents($cache), true);
             $this->tableCache = $json;
         }
 
@@ -707,7 +714,7 @@ class KoncertoEntityManager
         $hasCache = $hasCache && array_key_exists($entity, $this->tableCache[$this->dsn]);
         $hasTableName = $hasCache && array_key_exists('name', $this->tableCache[$this->dsn][$entity]);
         $hasTableName = $hasTableName && is_string($this->tableCache[$this->dsn][$entity]['name']);
-        if ($hasCache && $hasTableName && filemtime($this->cache) > filemtime($f)) {
+        if ($hasCache && $hasTableName && filemtime($this->tableCacheFile) > filemtime($f)) {
             return $this->tableCache[$this->dsn][$entity]['name'];
         }
 
@@ -728,23 +735,23 @@ class KoncertoEntityManager
         $tableName = $hasTable ? $parsed[$key]['table'] : strtolower($ref->getShortName());
 
         $this->tableCache[$this->dsn][$entity]['name'] = $tableName;
-        file_put_contents($this->cache, json_encode($this->tableCache));
+        file_put_contents($this->tableCacheFile, json_encode($this->tableCache));
 
         return $tableName;
     }
 
     /**
-     * @template T of object
-     * @param class-string<T> $entity
+     * @param class-string $entity
      * @return string
      * @throws \Exception
      */
     private function getTableKey($entity)
     {
         $f = str_replace('\\', '/', str_replace('App\\', $this->src . '/', $entity)) . '.php';
-        if (empty($this->tableCache) && is_file($this->cache) && filemtime($this->cache) > filemtime($f)) {
+        $cache = $this->tableCacheFile;
+        if (empty($this->tableCache) && is_file($cache) && filemtime($cache) > filemtime($f)) {
             /** @var array<string, array<string, array{name?: mixed, key?: mixed}>> */
-            $json = (array)json_decode((string)file_get_contents($this->cache), true);
+            $json = (array)json_decode((string)file_get_contents($cache), true);
             $this->tableCache = $json;
         }
 
@@ -752,7 +759,7 @@ class KoncertoEntityManager
         $hasCache = $hasCache && array_key_exists($entity, $this->tableCache[$this->dsn]);
         $hasTableKey = $hasCache && array_key_exists('key', $this->tableCache[$this->dsn][$entity]);
         $hasTableKey = $hasTableKey && is_string($this->tableCache[$this->dsn][$entity]['key']);
-        if ($hasCache && $hasTableKey && filemtime($this->cache) > filemtime($f)) {
+        if ($hasCache && $hasTableKey && filemtime($this->tableCacheFile) > filemtime($f)) {
             return $this->tableCache[$this->dsn][$entity]['key'];
         }
 
@@ -773,7 +780,7 @@ class KoncertoEntityManager
         $tableKey = $hasKey ? $parsed[$key]['key'] : 'id';
 
         $this->tableCache[$this->dsn][$entity]['key'] = $tableKey;
-        file_put_contents($this->cache, json_encode($this->tableCache));
+        file_put_contents($this->tableCacheFile, json_encode($this->tableCache));
 
         return $tableKey;
     }
@@ -785,21 +792,77 @@ class KoncertoEntityManager
      * @return T
      * @throws \Exception
      */
-    public static function hydrate($entity, $data)
+    public function hydrate($entity, $data)
     {
-        $ref = new \ReflectionClass($entity);
-        $props = $ref->getProperties(\ReflectionProperty::IS_PUBLIC);
+        $props = $this->describe($entity);
 
         $entity = new $entity();
 
-        foreach ($props as $prop) {
-            $name = $prop->getName();
+        foreach ($props as $name => $infos) {
             if (array_key_exists($name, $data)) {
-                $entity->{$name} = $data[$name];
+                $value = $data[$name];
+                if (is_array($infos) && array_key_exists('int', $infos) && is_numeric($value)) {
+                    $value = intval($value);
+                }
+                if (is_array($infos) && array_key_exists('integer', $infos) && is_numeric($value)) {
+                    $value = intval($value);
+                }
+                if (is_array($infos) && array_key_exists('float', $infos) && is_numeric($value)) {
+                    $value = floatval($value);
+                }
+                if (is_array($infos) && array_key_exists('double', $infos) && is_numeric($value)) {
+                    $value = floatval($value);
+                }
+                if (is_array($infos) && array_key_exists('bool', $infos)) {
+                    $value = !empty($value);
+                }
+                if (is_array($infos) && array_key_exists('boolean', $infos)) {
+                    $value = !empty($value);
+                }
+                $entity->{$name} = $value;
             }
         }
 
         return $entity;
+    }
+
+    /**
+     * @param class-string $entity
+     * @return array<string, mixed>
+     * @throws \Exception
+     */
+    public function describe($entity)
+    {
+        $f = str_replace('\\', '/', str_replace('App\\', $this->src . '/', $entity)) . '.php';
+        $cache = $this->entityCacheFile;
+        if (empty($this->entityCache) && is_file($cache) && filemtime($cache) > filemtime($f)) {
+            /** @var array<string, array<string, array<string, mixed>>> */
+            $json = (array)json_decode((string)file_get_contents($cache), true);
+            $this->entityCache = $json;
+        }
+
+        $hasCache = array_key_exists($this->dsn, $this->entityCache);
+        $hasCache = $hasCache && array_key_exists($entity, $this->entityCache[$this->dsn]);
+        if ($hasCache && filemtime($this->entityCacheFile) > filemtime($f)) {
+            return $this->entityCache[$this->dsn][$entity];
+        }
+
+        $desc = array();
+        $ref = new \ReflectionClass($entity);
+        $props = $ref->getProperties(\ReflectionProperty::IS_PUBLIC);
+        foreach ($props as $prop) {
+            if (false !== $prop->getDocComment()) {
+                $desc[$prop->getName()] = KoncertoAnnotation::parseAnnotation($prop->getDocComment(), 'var');
+            } else {
+                $obj = new $entity();
+                $desc[$prop->getName()] = gettype($prop->getValue($obj));
+            }
+        }
+
+        $this->entityCache[$this->dsn][$entity] = $desc;
+        file_put_contents($this->entityCacheFile, json_encode($this->entityCache));
+
+        return $desc;
     }
 }
 
