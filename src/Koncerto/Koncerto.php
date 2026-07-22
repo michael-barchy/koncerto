@@ -82,39 +82,28 @@ class Koncerto
     {
         /** @var array<string, string> */
         $autoload = array_key_exists('autoload', $this->config) ? (array)$this->config['autoload'] : array();
-        $autoload = array_flip($autoload);
         $root = $this->getDocumentRoot();
         spl_autoload_register(function ($class) use ($autoload, $root) {
             if (class_exists($class, false)) {
                 return;
             }
 
-            $mapping = array_filter($autoload, function ($prefix) use ($class) {
-                return 0 === strpos($class, $prefix);
-            });
+            foreach ($autoload as $prefix => $src) {
+                if (0 !== strpos($class, $prefix)) {
+                    continue;
+                }
 
-            $prefix = array_values($mapping);
-            $prefix = array_shift($prefix);
-            if (null === $prefix) {
-                $prefix = '';
-            }
+                $classFile = sprintf(
+                    '%s/%s/%s',
+                    $root,
+                    $src,
+                    preg_replace('/\\\/', '/', str_replace($prefix, '', $class)) . '.php'
+                );
 
-            $mapping = array_flip($mapping);
-            $src = array_shift($mapping);
-            if (null === $src) {
-                return;
-            }
-
-            $classFile = sprintf(
-                '%s/%s/%s',
-                $root,
-                $src,
-                preg_replace('/\\\/', '/', str_replace($prefix, '', $class)) . '.php'
-            );
-
-            $classPath = 'phar://' === substr($classFile, 0, 7) ? $classFile : realpath($classFile);
-            if (false !== $classPath && is_file($classPath)) {
-                require_once($classPath);
+                $classPath = 'phar://' === substr($classFile, 0, 7) ? $classFile : realpath($classFile);
+                if (false !== $classPath && is_file($classPath)) {
+                    require_once($classPath);
+                }
             }
         });
     }
