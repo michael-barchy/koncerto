@@ -1090,17 +1090,31 @@ JS;
                         '_live=' + encodeURIComponent(JSON.stringify(state))
                     ].join('&');
                     var url = new URL(location.href);
-                    console.debug(url.toString());
                     impulsus.xhr(url.toString(), function (response) {
                         var state = JSON.parse(response);
                         if ('object' === typeof state) {
                             for (var key in state) {
                                 if (key in controller.targets) {
                                     var attr = controller.targets[key].attr('data-model-attr');
-                                    if (attr) {
-                                        controller.targets[key].attr(attr, state[key]);
+                                    var value = state[key];
+                                    if (Array.isArray(value) || 'object' === typeof value) {
+                                        var selector = '[data-model="' + key + '"] [data-model-' + key + ']';
+                                        var subModels = Array.prototype.slice.call(document.querySelectorAll(selector));
+                                        subModels.forEach(function(subModel) {
+                                            var dataModel = subModel.getAttribute('data-model-' + key);
+                                            subModel.setAttribute('data--live-target-' + key, dataModel);
+                                        });
+                                        if (attr) {
+                                            controller.targets[key].attr('data--live-attr-' + key, attr);
+                                        }
+                                        controller.targets[key].refreshTargets();
+                                        controller.targets[key].merge(value);
                                     } else {
-                                        controller.targets[key].set(state[key]);
+                                        if (attr) {
+                                            controller.targets[key].attr(attr, value);
+                                        } else {
+                                            controller.targets[key].set(value);
+                                        }
                                     }
                                 }
                             }
