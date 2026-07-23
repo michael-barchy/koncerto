@@ -1075,14 +1075,17 @@ JS;
                 <<<JS
                 controller.on(%s, function (param) {
                     var state = {};
-                    for (var key in controller.targets) {
-                        var attr = controller.targets[key].attr('data-model-attr');
-                        if (attr) {
-                            state[key] = controller.targets[key].attr(attr);
-                        } else {
-                            state[key] = controller.targets[key].get();
+                    var updateState = function() {
+                        for (var key in controller.targets) {
+                            var attr = controller.targets[key].attr('data-model-attr');
+                            if (attr) {
+                                state[key] = controller.targets[key].attr(attr);
+                            } else {
+                                state[key] = controller.targets[key].get();
+                            }
                         }
-                    }
+                    };
+                    updateState();
                     var bootstrap = '{$bootstrap}';
                     var route = '{$this->getRequest()->getPathInfo()}';
                     var params = '&' + [
@@ -1109,6 +1112,7 @@ JS;
                                         }
                                         controller.targets[key].refreshTargets();
                                         controller.targets[key].merge(value);
+                                        updateState();
                                     } else {
                                         if (attr) {
                                             controller.targets[key].attr(attr, value);
