@@ -979,6 +979,7 @@ class KoncertoImpulsusController extends KoncertoController
         }
 
         $targetsJS = $this->targets();
+        $commonJS = $this->common();
         $eventsJS = $this->events();
 
         return <<<JS
@@ -1001,6 +1002,7 @@ window.addEventListener('impulsus:controller', function (event) {
 
             impulsus.controller(function (controller) {
 {$targetsJS}
+{$commonJS}
 {$eventsJS}
             }, event);
         }
@@ -1048,32 +1050,14 @@ JS;
     /**
      * @return string
      */
-    private function events()
+    private function common()
     {
-        $className = get_class($this);
-        $actions = array();
-        $ref = new \ReflectionClass($className);
-        $f = $ref->getFileName();
-        if (false !== $f) {
-            $parsed = KoncertoAnnotation::parseClass($f);
-            foreach ($parsed as $classProp => $annotations) {
-                $parts = explode('::', $classProp);
-                $propName = array_pop($parts);
-                /** @var array<array-key, mixed> $annotations */
-                if (!empty($propName) && array_key_exists('liveAction()', $annotations)) {
-                    $actions[$propName] = $annotations['liveAction()'];
-                }
-            }
-        }
-
         $hasBootstrap = array_key_exists('BOOTSTRAP', $_SERVER) && is_string($_SERVER['BOOTSTRAP']);
         $bootstrap = $hasBootstrap ? $_SERVER['BOOTSTRAP'] : '';
 
-        $events = array();
-        foreach ($actions as $actionName => $action) {
-            array_push($events, sprintf(
-                <<<JS
-                controller.on(%s, function (param) {
+        return <<<JS
+            var controllerEvent = function(trigger, actionName) {
+                controller.on(trigger, function (param) {
                     var state = {};
                     var updateState = function() {
                         for (var key in controller.targets) {
@@ -1123,8 +1107,38 @@ JS;
                                 }
                             }
                         }
-                    }, 'POST', %s + params, 'application/x-www-form-urlencoded');
+                    }, 'POST', actionName + params, 'application/x-www-form-urlencoded');
                 });
+            };
+JS;
+    }
+
+    /**
+     * @return string
+     */
+    private function events()
+    {
+        $className = get_class($this);
+        $actions = array();
+        $ref = new \ReflectionClass($className);
+        $f = $ref->getFileName();
+        if (false !== $f) {
+            $parsed = KoncertoAnnotation::parseClass($f);
+            foreach ($parsed as $classProp => $annotations) {
+                $parts = explode('::', $classProp);
+                $propName = array_pop($parts);
+                /** @var array<array-key, mixed> $annotations */
+                if (!empty($propName) && array_key_exists('liveAction()', $annotations)) {
+                    $actions[$propName] = $annotations['liveAction()'];
+                }
+            }
+        }
+
+        $events = array();
+        foreach ($actions as $actionName => $action) {
+            array_push($events, sprintf(
+                <<<JS
+                controllerEvent(%s, %s);
 JS
                 ,
                 json_encode($action['name']),
