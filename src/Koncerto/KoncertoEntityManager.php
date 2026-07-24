@@ -271,7 +271,7 @@ class KoncertoEntityManager
      * @return string
      * @throws \Exception
      */
-    private function getTableKey($entity)
+    public function getTableKey($entity)
     {
         $f = str_replace('\\', '/', str_replace('App\\', $this->src . '/', $entity)) . '.php';
         $cache = $this->tableCacheFile;
