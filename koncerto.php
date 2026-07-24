@@ -1037,7 +1037,8 @@ JS;
         $targets = array();
         foreach ($props as $propName => $prop) {
             array_push($targets, sprintf(
-                "            controller.targets[%s].set(%s);",
+                "            if (%s in controller.targets) controller.targets[%s].set(%s);",
+                json_encode($prop['name']),
                 json_encode($prop['name']),
                 json_encode($this->{$propName})
             ));
@@ -1080,6 +1081,9 @@ JS;
                     impulsus.xhr(url.toString(), function (response) {
                         var state = JSON.parse(response);
                         if ('object' === typeof state) {
+                            if ('_redirect' in state) {
+                                location = state['_redirect'];
+                            }
                             for (var key in state) {
                                 if (key in controller.targets) {
                                     var attr = controller.targets[key].attr('data-model-attr');
