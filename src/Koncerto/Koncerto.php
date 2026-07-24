@@ -192,7 +192,7 @@ class Koncerto
      */
     private function asset($request)
     {
-        $file = '.' . $request->getPathInfo();
+        $file = '.' . $request->getPathInfo(false);
         if ('/' === substr($file, -1)) {
             $file = substr($file, 0, strlen($file) - 1);
         }

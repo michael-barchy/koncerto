@@ -44,10 +44,6 @@ class KoncertoRequest
             $this->pathName = $this->get('_route');
         }
 
-        if ('/' !== substr($this->pathName, -1)) {
-            $this->pathName .= '/';
-        }
-
         $appPrefix = $koncerto->getConfig('appPrefix');
         if (is_string($appPrefix) && 0 === strpos($this->pathName, $appPrefix)) {
             $this->pathName = substr($this->pathName, strlen($appPrefix));
@@ -80,11 +76,17 @@ class KoncertoRequest
     }
 
     /**
+     * @param boolean $asPath
      * @return string
      */
-    public function getPathInfo()
+    public function getPathInfo($asPath = true)
     {
-        return $this->pathName;
+        $path = $this->pathName;
+        if ($asPath && '/' !== substr($this->pathName, -1)) {
+            $path .= '/';
+        }
+
+        return $path;
     }
 
     /**
