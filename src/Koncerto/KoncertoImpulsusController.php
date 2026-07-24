@@ -193,6 +193,9 @@ JS;
                     impulsus.xhr(url.toString(), function (response) {
                         var state = JSON.parse(response);
                         if ('object' === typeof state) {
+                            if ('_redirect' in state) {
+                                location = state['_redirect'];
+                            }
                             for (var key in state) {
                                 if (key in controller.targets) {
                                     var attr = controller.targets[key].attr('data-model-attr');
