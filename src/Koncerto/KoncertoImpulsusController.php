@@ -150,7 +150,8 @@ JS;
         $targets = array();
         foreach ($props as $propName => $prop) {
             array_push($targets, sprintf(
-                "            controller.targets[%s].set(%s);",
+                "            if (%s in controller.targets) controller.targets[%s].set(%s);",
+                json_encode($prop['name']),
                 json_encode($prop['name']),
                 json_encode($this->{$propName})
             ));
