@@ -154,7 +154,7 @@ class KoncertoRequest
             $this->routes = array();
         }
 
-        if (empty($this->routes)) {
+        if (empty($this->routes) && is_dir($d)) {
             $routes = array();
 
             $controllers = scandir($d);
