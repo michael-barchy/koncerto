@@ -1298,7 +1298,7 @@ class KoncertoRequest
     {
         $d = $this->src . '/Controller/';
 
-        if (is_file($this->cache) && filemtime($d) < filemtime($this->cache)) {
+        if (is_file($this->cache) && is_dir($d) && filemtime($d) < filemtime($this->cache)) {
             /** @var array<string, mixed> */
             $routes = (array)json_decode($this->cache, true);
             $this->routes = $routes;
