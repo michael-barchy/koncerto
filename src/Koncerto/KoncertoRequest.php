@@ -109,7 +109,7 @@ class KoncertoRequest
      */
     public function match(&$args = array())
     {
-        $path = $this->pathName;
+        $path = $this->getPathInfo(true);
 
         $routes = array_filter($this->routes(), function ($route) use ($path) {
             /** @var array{name: string} $route */
