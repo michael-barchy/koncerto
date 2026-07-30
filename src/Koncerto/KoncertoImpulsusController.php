@@ -198,8 +198,12 @@ JS;
                                 location = state['_redirect'];
                             }
                             for (var key in state) {
-                                if (key in controller.targets) {
-                                    var attr = controller.targets[key].attr('data-model-attr');
+                                Object.keys(controller.targets).forEach(function (uniqueKey) {
+                                    var k = String(uniqueKey.split(':').shift());
+                                    if (key !== k) {
+                                        return;
+                                    }
+                                    var attr = controller.targets[uniqueKey].attr('data-model-attr');
                                     var value = state[key];
                                     if (Array.isArray(value) || 'object' === typeof value) {
                                         var selector = '[data-model="' + key + '"] [data-model-' + key + ']';
@@ -209,19 +213,19 @@ JS;
                                             subModel.setAttribute('data--live-target-' + key, dataModel);
                                         });
                                         if (attr) {
-                                            controller.targets[key].attr('data--live-attr-' + key, attr);
+                                            controller.targets[uniqueKey].attr('data--live-attr-' + key, attr);
                                         }
-                                        controller.targets[key].refreshTargets();
-                                        controller.targets[key].merge(value);
+                                        controller.targets[uniqueKey].refreshTargets();
+                                        controller.targets[uniqueKey].merge(value);
                                         updateState();
                                     } else {
                                         if (attr) {
-                                            controller.targets[key].attr(attr, value);
+                                            controller.targets[uniqueKey].attr(attr, value);
                                         } else {
-                                            controller.targets[key].set(value);
+                                            controller.targets[uniqueKey].set(value);
                                         }
                                     }
-                                }
+                                });
                             }
                         }
                     }, 'POST', actionName + params, 'application/x-www-form-urlencoded');
